@@ -1,7 +1,9 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
-
+from tkinter import filedialog
+import json
+import os
 
 class DarkTheme:
     def __init__(self):
@@ -135,6 +137,21 @@ class MultiTabApp:
         # ==== Двойной клик по заголовку для разворота/восстановления ====
         self.title_bar.bind("<Double-Button-1>", lambda e: self.toggle_maximize())
 
+        file_frame = tk.Frame(self.task_frame, bg=self.theme.bg_color)
+        file_frame.pack(pady=5)
+
+        save_button = tk.Button(
+            file_frame, text="Сохранить", command=self.save_tasks,
+            bg=self.theme.button_bg, fg=self.theme.button_fg, relief="flat", width=12
+        )
+        save_button.pack(side=tk.LEFT, padx=5)
+
+        load_button = tk.Button(
+            file_frame, text="Загрузить", command=self.load_tasks,
+            bg=self.theme.button_bg, fg=self.theme.button_fg, relief="flat", width=12
+        )
+        load_button.pack(side=tk.LEFT, padx=5)
+
     # ===== Методы управления окна =====
     def minimize(self):
         self.root.overrideredirect(False)
@@ -180,21 +197,63 @@ class MultiTabApp:
 
     # ===== Виджеты =====
     def create_task_widgets(self):
+        # Поле ввода задачи
+        tk.Label(self.task_frame, text="Название задачи:", bg=self.theme.bg_color, fg=self.theme.fg_color).pack(
+            pady=(5, 0), padx=10, anchor="w")
         self.task_entry = tk.Entry(
             self.task_frame,
-            width=40,
+            width=50,
             bg=self.theme.entry_bg,
             fg=self.theme.entry_fg,
             borderwidth=0
         )
-        self.task_entry.pack(pady=5, padx=10)
+        self.task_entry.pack(pady=2, padx=10)
 
+        # Поле ввода срока
+        tk.Label(self.task_frame, text="Срок выполнения (ДД.ММ.ГГГГ):", bg=self.theme.bg_color,
+                 fg=self.theme.fg_color).pack(pady=(5, 0), padx=10, anchor="w")
+        self.due_entry = tk.Entry(
+            self.task_frame,
+            width=20,
+            bg=self.theme.entry_bg,
+            fg=self.theme.entry_fg,
+            borderwidth=0
+        )
+        self.due_entry.pack(pady=2, padx=10)
+
+        # Поле описания
+        tk.Label(self.task_frame, text="Описание:", bg=self.theme.bg_color, fg=self.theme.fg_color).pack(pady=(5, 0),
+                                                                                                         padx=10,
+                                                                                                         anchor="w")
+        self.desc_text = tk.Text(
+            self.task_frame,
+            width=50,
+            height=4,
+            bg=self.theme.entry_bg,
+            fg=self.theme.entry_fg,
+            borderwidth=0,
+            highlightthickness=0
+        )
+        self.desc_text.pack(pady=2, padx=10)
+
+        # Приоритет
+        tk.Label(self.task_frame, text="Приоритет:", bg=self.theme.bg_color, fg=self.theme.fg_color).pack(pady=(5, 0),
+                                                                                                          padx=10,
+                                                                                                          anchor="w")
+        self.priority_var = tk.StringVar(value="Средний")
+        priorities = ["Низкий", "Средний", "Высокий"]
+        self.priority_menu = ttk.Combobox(self.task_frame, textvariable=self.priority_var, values=priorities,
+                                          state="readonly", width=15)
+        self.priority_menu.pack(pady=2, padx=10)
+
+        # Кнопка добавления
         add_button = tk.Button(
             self.task_frame, text="Добавить", command=self.add_task,
             bg=self.theme.button_bg, fg=self.theme.button_fg, relief="flat"
         )
-        add_button.pack(pady=2)
+        add_button.pack(pady=5)
 
+        # Список задач
         self.task_list = tk.Listbox(
             self.task_frame,
             bg=self.theme.bg_color,
@@ -202,9 +261,30 @@ class MultiTabApp:
             selectbackground=self.theme.accent_color,
             selectforeground=self.theme.fg_color,
             borderwidth=0,
-            highlightthickness=0
+            highlightthickness=0,
+            width=80,
+            height=10
         )
-        self.task_list.pack(pady=20, padx=10, fill=tk.BOTH, expand=True)
+        self.task_list.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
+
+        # Привязка выбора задачи для редактирования
+        self.task_list.bind("<<ListboxSelect>>", self.on_task_select)
+
+        # Кнопки редактирования и удаления
+        btn_frame = tk.Frame(self.task_frame, bg=self.theme.bg_color)
+        btn_frame.pack(pady=5)
+
+        update_button = tk.Button(
+            btn_frame, text="Обновить", command=self.update_task,
+            bg=self.theme.button_bg, fg=self.theme.button_fg, relief="flat", width=12
+        )
+        update_button.pack(side=tk.LEFT, padx=5)
+
+        delete_button = tk.Button(
+            btn_frame, text="Удалить", command=self.delete_task,
+            bg=self.theme.button_bg, fg=self.theme.button_fg, relief="flat", width=12
+        )
+        delete_button.pack(side=tk.LEFT, padx=5)
 
     def create_map_widgets(self):
         map_label = tk.Label(
@@ -236,16 +316,134 @@ class MultiTabApp:
 
     # ===== Логика задач =====
     def add_task(self):
-        task = self.task_entry.get()
-        if task:
-            timestamp = datetime.now().strftime("%H:%M")
-            formatted_task = f"{timestamp} - {task}"
-            self.tasks.append(formatted_task)
-            self.task_list.insert(tk.END, formatted_task)
-            self.task_entry.delete(0, tk.END)
-        else:
-            messagebox.showwarning("Предупреждение", "Введите задачу!")
+        task = self.task_entry.get().strip()
+        due = self.due_entry.get().strip()
+        desc = self.desc_text.get("1.0", tk.END).strip()
+        priority = self.priority_var.get()
 
+        if not task:
+            messagebox.showwarning("Предупреждение", "Введите название задачи!")
+            return
+
+        # Формат отображения в списке
+        display_text = f"[{priority}] {task} (Срок: {due})"
+        if desc:
+            display_text += f" - {desc}"
+
+        self.tasks.append({
+            "task": task,
+            "due": due,
+            "desc": desc,
+            "priority": priority
+        })
+
+        self.task_list.insert(tk.END, display_text)
+
+        # Очистка полей
+        self.task_entry.delete(0, tk.END)
+        self.due_entry.delete(0, tk.END)
+        self.desc_text.delete("1.0", tk.END)
+        self.priority_var.set("Средний")
+
+    def on_task_select(self, event):
+        """Заполняем поля для редактирования выбранной задачи"""
+        try:
+            index = self.task_list.curselection()[0]
+            task = self.tasks[index]
+
+            # Заполняем поля
+            self.task_entry.delete(0, tk.END)
+            self.task_entry.insert(0, task["task"])
+
+            self.due_entry.delete(0, tk.END)
+            self.due_entry.insert(0, task["due"])
+
+            self.desc_text.delete("1.0", tk.END)
+            self.desc_text.insert(tk.END, task["desc"])
+
+            self.priority_var.set(task["priority"])
+        except IndexError:
+            pass  # ничего не делаем, если ничего не выбрано
+
+    def update_task(self):
+        """Обновление выбранной задачи"""
+        try:
+            index = self.task_list.curselection()[0]
+            task = self.task_entry.get().strip()
+            due = self.due_entry.get().strip()
+            desc = self.desc_text.get("1.0", tk.END).strip()
+            priority = self.priority_var.get()
+
+            if not task:
+                messagebox.showwarning("Предупреждение", "Введите название задачи!")
+                return
+
+            # Обновляем данные
+            self.tasks[index] = {
+                "task": task,
+                "due": due,
+                "desc": desc,
+                "priority": priority
+            }
+
+            # Обновляем отображение в Listbox
+            display_text = f"[{priority}] {task} (Срок: {due})"
+            if desc:
+                display_text += f" - {desc}"
+
+            self.task_list.delete(index)
+            self.task_list.insert(index, display_text)
+        except IndexError:
+            messagebox.showwarning("Предупреждение", "Выберите задачу для редактирования!")
+
+    def delete_task(self):
+        """Удаление выбранной задачи"""
+        try:
+            index = self.task_list.curselection()[0]
+            self.task_list.delete(index)
+            self.tasks.pop(index)
+        except IndexError:
+            messagebox.showwarning("Предупреждение", "Выберите задачу для удаления!")
+
+    # ==== Методы для сохранения и загрузки ====
+
+    def save_tasks(self):
+        """Сохраняем задачи в выбранный файл"""
+        file_path = filedialog.asksaveasfilename(
+            title="Сохранить задачи",
+            defaultextension=".txt",
+            filetypes=[("Текстовые файлы", "*.txt"), ("Все файлы", "*.*")]
+        )
+        if file_path:
+            try:
+                with open(file_path, "w", encoding="utf-8") as f:
+                    json.dump(self.tasks, f, ensure_ascii=False, indent=2)
+                messagebox.showinfo("Сохранение", f"Задачи сохранены в {os.path.basename(file_path)}")
+            except Exception as e:
+                messagebox.showerror("Ошибка", f"Не удалось сохранить файл:\n{str(e)}")
+
+    def load_tasks(self):
+        """Загружаем задачи из выбранного файла"""
+        file_path = filedialog.askopenfilename(
+            title="Открыть задачи",
+            defaultextension=".txt",
+            filetypes=[("Текстовые файлы", "*.txt"), ("Все файлы", "*.*")]
+        )
+        if file_path:
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    loaded_tasks = json.load(f)
+                self.tasks = loaded_tasks
+                # Обновляем Listbox
+                self.task_list.delete(0, tk.END)
+                for t in self.tasks:
+                    display_text = f"[{t['priority']}] {t['task']} (Срок: {t['due']})"
+                    if t['desc']:
+                        display_text += f" - {t['desc']}"
+                    self.task_list.insert(tk.END, display_text)
+                messagebox.showinfo("Загрузка", f"Задачи загружены из {os.path.basename(file_path)}")
+            except Exception as e:
+                messagebox.showerror("Ошибка", f"Не удалось загрузить файл:\n{str(e)}")
 
 def main():
     root = tk.Tk()
