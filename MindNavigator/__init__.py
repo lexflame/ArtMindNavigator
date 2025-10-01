@@ -137,38 +137,73 @@ class MultiTabApp:
 
     # ===== Задачи =====
     def create_task_widgets(self):
+        # ===== ФИЛЬТРЫ И ПОИСК =====
+        filter_frame = tk.Frame(self.task_frame, bg=self.theme.bg_color)
+        filter_frame.pack(fill=tk.X, pady=5, padx=10)
+
+        tk.Label(filter_frame, text="Поиск:", bg=self.theme.bg_color, fg=self.theme.fg_color).pack(side=tk.LEFT, padx=2)
+        self.search_var = tk.StringVar()
+        self.search_entry = tk.Entry(filter_frame, textvariable=self.search_var, bg=self.theme.entry_bg, fg=self.theme.entry_fg)
+        self.search_entry.pack(side=tk.LEFT, padx=2)
+        self.search_var.trace_add("write", lambda *args: self.refresh_task_list())
+
+        tk.Label(filter_frame, text="Приоритет:", bg=self.theme.bg_color, fg=self.theme.fg_color).pack(side=tk.LEFT, padx=5)
+        self.filter_priority_var = tk.StringVar(value="Все")
+        self.filter_priority_menu = ttk.Combobox(filter_frame, textvariable=self.filter_priority_var,
+                                                 values=["Все","Низкий","Средний","Высокий"], state="readonly", width=10)
+        self.filter_priority_menu.pack(side=tk.LEFT, padx=2)
+        self.filter_priority_var.trace_add("write", lambda *args: self.refresh_task_list())
+
+        tk.Label(filter_frame, text="Срок до:", bg=self.theme.bg_color, fg=self.theme.fg_color).pack(side=tk.LEFT, padx=5)
+        self.filter_date = DateEntry(filter_frame, width=12, background='darkblue', foreground='white',
+                                     borderwidth=1, date_pattern='dd.mm.yyyy')
+        self.filter_date.pack(side=tk.LEFT, padx=2)
+        self.filter_date.bind("<<DateEntrySelected>>", lambda e: self.refresh_task_list())
+
+        # ===== ФОРМА СОЗДАНИЯ / РЕДАКТИРОВАНИЯ ЗАДАЧ =====
         input_frame = tk.Frame(self.task_frame, bg=self.theme.bg_color)
-        input_frame.pack(pady=5, padx=10, fill=tk.X)
+        input_frame.pack(fill=tk.X, pady=5, padx=10)
 
-        self.task_entry = tk.Entry(input_frame, width=20, bg=self.theme.entry_bg, fg=self.theme.entry_fg, borderwidth=0)
-        self.task_entry.pack(side=tk.LEFT, padx=2)
+        self.task_entry = tk.Entry(input_frame, bg=self.theme.entry_bg, fg=self.theme.entry_fg)
+        self.task_entry.pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
 
-        self.desc_entry = tk.Entry(input_frame, width=25, bg=self.theme.entry_bg, fg=self.theme.entry_fg, borderwidth=0)
-        self.desc_entry.pack(side=tk.LEFT, padx=2)
+        self.desc_entry = tk.Entry(input_frame, bg=self.theme.entry_bg, fg=self.theme.entry_fg)
+        self.desc_entry.pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
 
         self.date_entry = DateEntry(input_frame, width=12, background='darkblue', foreground='white', borderwidth=1, date_pattern='dd.mm.yyyy')
         self.date_entry.pack(side=tk.LEFT, padx=2)
 
         self.hour_var = tk.StringVar(value="12")
         self.minute_var = tk.StringVar(value="00")
-        self.hour_cb = ttk.Combobox(input_frame, width=3, textvariable=self.hour_var, values=[f"{i:02d}" for i in range(24)], state="readonly")
+        self.hour_cb = ttk.Combobox(input_frame, width=3, textvariable=self.hour_var,
+                                    values=[f"{i:02d}" for i in range(24)], state="readonly")
         self.hour_cb.pack(side=tk.LEFT)
-        self.minute_cb = ttk.Combobox(input_frame, width=3, textvariable=self.minute_var, values=[f"{i:02d}" for i in range(60)], state="readonly")
+        self.minute_cb = ttk.Combobox(input_frame, width=3, textvariable=self.minute_var,
+                                      values=[f"{i:02d}" for i in range(60)], state="readonly")
         self.minute_cb.pack(side=tk.LEFT)
 
         self.priority_var = tk.StringVar(value="Средний")
-        self.priority_menu = ttk.Combobox(input_frame, textvariable=self.priority_var, values=["Низкий","Средний","Высокий"], state="readonly", width=10)
+        self.priority_menu = ttk.Combobox(input_frame, textvariable=self.priority_var,
+                                          values=["Низкий","Средний","Высокий"], state="readonly", width=10)
         self.priority_menu.pack(side=tk.LEFT, padx=2)
 
-        add_btn = tk.Button(input_frame, text="Добавить", command=self.add_task, bg=self.theme.button_bg, fg=self.theme.button_fg, relief="flat")
+        add_btn = tk.Button(input_frame, text="Добавить", command=self.add_task,
+                            bg=self.theme.button_bg, fg=self.theme.button_fg, relief="flat")
         add_btn.pack(side=tk.LEFT, padx=2)
 
+        # ===== СПИСОК ЗАДАЧ С Drag & Drop =====
         self.task_list = tk.Listbox(self.task_frame, bg=self.theme.bg_color, fg=self.theme.fg_color,
                                     selectbackground=self.theme.accent_color, selectforeground=self.theme.fg_color,
-                                    borderwidth=0, highlightthickness=0, width=120, height=15)
+                                    borderwidth=0, highlightthickness=0, height=15)
         self.task_list.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
         self.task_list.bind("<<ListboxSelect>>", self.on_task_select)
 
+        # Drag & Drop
+        self.task_list.bind("<Button-1>", self.start_drag)
+        self.task_list.bind("<B1-Motion>", self.do_drag)
+        self.drag_index = None
+
+        # ===== КНОПКИ ОБНОВИТЬ / УДАЛИТЬ =====
         btn_frame = tk.Frame(self.task_frame, bg=self.theme.bg_color)
         btn_frame.pack(pady=5)
         tk.Button(btn_frame, text="Обновить", command=self.update_task,
@@ -176,6 +211,19 @@ class MultiTabApp:
         tk.Button(btn_frame, text="Удалить", command=self.delete_task,
                   bg=self.theme.button_bg, fg=self.theme.button_fg, relief="flat", width=12).pack(side=tk.LEFT, padx=5)
 
+    # ===== Drag & Drop =====
+    def start_drag(self, event):
+        self.drag_index = self.task_list.nearest(event.y)
+
+    def do_drag(self, event):
+        new_index = self.task_list.nearest(event.y)
+        if new_index != self.drag_index:
+            self.tasks[self.drag_index], self.tasks[new_index] = self.tasks[new_index], self.tasks[self.drag_index]
+            self.refresh_task_list()
+            self.task_list.selection_set(new_index)
+            self.drag_index = new_index
+
+    # ===== Работа с задачами =====
     def add_task(self):
         task = self.task_entry.get().strip()
         desc = self.desc_entry.get().strip()
@@ -188,7 +236,6 @@ class MultiTabApp:
             messagebox.showwarning("Предупреждение", "Введите название задачи!")
             return
 
-        display_text = f"[{priority}] {task} - {desc} (Срок: {due})" if desc else f"[{priority}] {task} (Срок: {due})"
         self.tasks.append({"task": task, "desc": desc, "due": due, "priority": priority})
         self.refresh_task_list()
         self.clear_form()
@@ -235,9 +282,28 @@ class MultiTabApp:
 
     def refresh_task_list(self):
         self.task_list.delete(0, tk.END)
+        query = self.search_var.get().lower()
+        priority_filter = self.filter_priority_var.get()
+        date_filter = self.filter_date.get_date()
+        today = datetime.now().date()
+
         for t in self.tasks:
+            task_text = t["task"].lower()
             display_text = f"[{t['priority']}] {t['task']} - {t['desc']} (Срок: {t['due']})" if t['desc'] else f"[{t['priority']}] {t['task']} (Срок: {t['due']})"
-            self.task_list.insert(tk.END, display_text)
+            task_date = datetime.strptime(t["due"].split()[0], "%d.%m.%Y").date()
+
+            if (query in task_text) and \
+               (priority_filter == "Все" or t["priority"] == priority_filter) and \
+               (task_date <= date_filter):
+                self.task_list.insert(tk.END, display_text)
+                index = self.task_list.size() - 1
+                # Подсветка
+                if task_date < today:
+                    self.task_list.itemconfig(index, fg="#FF5555")  # Просрочено
+                elif task_date == today:
+                    self.task_list.itemconfig(index, fg="#FFD700")  # Сегодня
+                else:
+                    self.task_list.itemconfig(index, fg=self.theme.fg_color)
 
     def clear_form(self):
         self.task_entry.delete(0, tk.END)
