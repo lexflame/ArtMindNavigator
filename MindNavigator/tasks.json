@@ -1,8 +1,13 @@
-[
-  {
-    "task": "123",
-    "desc": "123123",
-    "due": "01.10.2025 12:00",
-    "priority": "Средний"
-  }
-]
+{
+    "tasks": [
+        {
+            "task": "1",
+            "desc": "22222",
+            "due": "01.10.2025 12:00",
+            "priority": "Средний",
+            "done": false,
+            "important": true
+        }
+    ],
+    "completed": []
+}

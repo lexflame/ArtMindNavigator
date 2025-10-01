@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 from tkcalendar import DateEntry
 from datetime import datetime
 import json
@@ -21,64 +21,55 @@ class MultiTabApp:
         self.root = root
         self.theme = DarkTheme()
         self.tasks = []
+        self.completed_tasks = []
         self.autosave_file = "tasks.json"
 
-        # Убираем стандартный заголовок и разворачиваем
+        # ===== Настройка окна =====
         self.root.overrideredirect(True)
         self.root.state("zoomed")
         self.root.config(bg=self.theme.bg_color)
         self.is_maximized = True
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
-        # ===== КАСТОМНЫЙ ЗАГОЛОВОК =====
+        # ===== Кастомный заголовок =====
         self.title_bar = tk.Frame(self.root, bg=self.theme.title_bar_bg, height=40)
-        self.title_bar.pack(fill=tk.X, side=tk.TOP)
-
+        self.title_bar.pack(fill=tk.X)
         self.title_label = tk.Label(self.title_bar, text="MindNavigator",
                                     bg=self.theme.title_bar_bg, fg=self.theme.fg_color,
                                     font=("Helvetica", 12, "bold"))
         self.title_label.pack(side=tk.LEFT, padx=5)
-
-        # ===== Закладки =====
-        self.bookmark_frame = tk.Frame(self.title_bar, bg=self.theme.title_bar_bg)
-        self.bookmark_frame.pack(side=tk.LEFT, padx=20)
-
-        self.bookmarks = {
-            "Задачи": self.show_tasks,
-            "Карты": self.show_maps,
-            "Заметки": self.show_notes,
-            "Навигатор": self.show_nav
-        }
-
-        for name, cmd in self.bookmarks.items():
-            btn = tk.Button(self.bookmark_frame, text=name, command=cmd,
-                            bg=self.theme.button_bg, fg=self.theme.button_fg,
-                            relief="flat", padx=10, pady=3)
-            btn.pack(side=tk.LEFT, padx=5)
-
-        # ===== Кнопки управления окном =====
         self.btn_min = tk.Button(self.title_bar, text="━", command=self.minimize,
                                  bg=self.theme.button_bg, fg=self.theme.button_fg, relief="flat", width=4)
         self.btn_min.pack(side=tk.RIGHT, padx=2)
-
         self.btn_max = tk.Button(self.title_bar, text="❐", command=self.toggle_maximize,
                                  bg=self.theme.button_bg, fg=self.theme.button_fg, relief="flat", width=4)
         self.btn_max.pack(side=tk.RIGHT, padx=2)
-
         self.btn_close = tk.Button(self.title_bar, text="✕", command=self.on_close,
                                    bg="#FF5555", fg="white", relief="flat", width=4)
         self.btn_close.pack(side=tk.RIGHT, padx=2)
+        self.btn_settings = tk.Button(self.title_bar, text="⚙", command=self.select_file_paths,
+                                      bg=self.theme.button_bg, fg=self.theme.button_fg, relief="flat", width=4)
+        self.btn_settings.pack(side=tk.RIGHT, padx=2)
+
+        # ===== Панель закладок =====
+        self.bookmark_toolbar = tk.Frame(self.root, bg=self.theme.title_bar_bg, height=40)
+        self.bookmark_toolbar.pack(fill=tk.X)
+        self.bookmarks = {"Задачи": self.show_tasks, "Карты": self.show_maps,
+                          "Заметки": self.show_notes, "Навигатор": self.show_nav}
+        self.bookmark_icons = {"Задачи": "📝","Карты": "🗺️","Заметки": "📓","Навигатор": "🧭"}
+        for name, icon in self.bookmark_icons.items():
+            btn = tk.Button(self.bookmark_toolbar, text=f"{icon} {name}", command=self.bookmarks[name],
+                            bg=self.theme.button_bg, fg=self.theme.button_fg, relief="flat", padx=10, pady=5)
+            btn.pack(side=tk.LEFT, padx=2, pady=2)
 
         # ===== Контент =====
         self.content = tk.Frame(self.root, bg=self.theme.bg_color)
         self.content.pack(fill=tk.BOTH, expand=True)
-
         self.task_frame = tk.Frame(self.content, bg=self.theme.bg_color)
         self.map_frame = tk.Frame(self.content, bg=self.theme.bg_color)
         self.note_frame = tk.Frame(self.content, bg=self.theme.bg_color)
         self.nav_frame = tk.Frame(self.content, bg=self.theme.bg_color)
 
-        # ===== Инициализация вкладок =====
         self.show_tasks()
         self.create_task_widgets()
         self.create_map_widgets()
@@ -90,14 +81,19 @@ class MultiTabApp:
         self.title_bar.bind("<B1-Motion>", self.on_move)
         self.title_bar.bind("<Double-Button-1>", lambda e: self.toggle_maximize())
 
-        # ===== Автозагрузка задач =====
+        # ===== Автозагрузка данных =====
         if os.path.exists(self.autosave_file):
             try:
                 with open(self.autosave_file, "r", encoding="utf-8") as f:
-                    self.tasks = json.load(f)
-                self.refresh_task_list()
+                    data = json.load(f)
+                    self.tasks = data.get("tasks", [])
+                    self.completed_tasks = data.get("completed", [])
             except:
                 self.tasks = []
+                self.completed_tasks = []
+
+        self.task_list_frame = tk.Frame(self.task_frame, bg=self.theme.bg_color)
+        self.task_list_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
     # ===== Окно =====
     def minimize(self):
@@ -135,95 +131,70 @@ class MultiTabApp:
     def show_notes(self): self.show_frame(self.note_frame)
     def show_nav(self): self.show_frame(self.nav_frame)
 
+    # ===== Настройка файлов =====
+    def select_file_paths(self):
+        notes_file = filedialog.asksaveasfilename(title="Выберите файл для заметок",
+                                                  defaultextension=".txt",
+                                                  filetypes=[("Text files","*.txt")])
+        if notes_file: self.notes_file = notes_file
+
+        maps_file = filedialog.asksaveasfilename(title="Выберите файл для карт",
+                                                 defaultextension=".txt",
+                                                 filetypes=[("Text files","*.txt")])
+        if maps_file: self.maps_file = maps_file
+
+        tasks_file = filedialog.asksaveasfilename(title="Выберите файл для задач",
+                                                  defaultextension=".json",
+                                                  filetypes=[("JSON files","*.json")])
+        if tasks_file: self.autosave_file = tasks_file
+
+        messagebox.showinfo("Настройки", "Файлы успешно выбраны!")
+
     # ===== Задачи =====
     def create_task_widgets(self):
-        # ===== ФИЛЬТРЫ И ПОИСК =====
-        filter_frame = tk.Frame(self.task_frame, bg=self.theme.bg_color)
-        filter_frame.pack(fill=tk.X, pady=5, padx=10)
-
-        tk.Label(filter_frame, text="Поиск:", bg=self.theme.bg_color, fg=self.theme.fg_color).pack(side=tk.LEFT, padx=2)
-        self.search_var = tk.StringVar()
-        self.search_entry = tk.Entry(filter_frame, textvariable=self.search_var, bg=self.theme.entry_bg, fg=self.theme.entry_fg)
-        self.search_entry.pack(side=tk.LEFT, padx=2)
-        self.search_var.trace_add("write", lambda *args: self.refresh_task_list())
-
-        tk.Label(filter_frame, text="Приоритет:", bg=self.theme.bg_color, fg=self.theme.fg_color).pack(side=tk.LEFT, padx=5)
-        self.filter_priority_var = tk.StringVar(value="Все")
-        self.filter_priority_menu = ttk.Combobox(filter_frame, textvariable=self.filter_priority_var,
-                                                 values=["Все","Низкий","Средний","Высокий"], state="readonly", width=10)
-        self.filter_priority_menu.pack(side=tk.LEFT, padx=2)
-        self.filter_priority_var.trace_add("write", lambda *args: self.refresh_task_list())
-
-        tk.Label(filter_frame, text="Срок до:", bg=self.theme.bg_color, fg=self.theme.fg_color).pack(side=tk.LEFT, padx=5)
-        self.filter_date = DateEntry(filter_frame, width=12, background='darkblue', foreground='white',
-                                     borderwidth=1, date_pattern='dd.mm.yyyy')
-        self.filter_date.pack(side=tk.LEFT, padx=2)
-        self.filter_date.bind("<<DateEntrySelected>>", lambda e: self.refresh_task_list())
-
-        # ===== ФОРМА СОЗДАНИЯ / РЕДАКТИРОВАНИЯ ЗАДАЧ =====
         input_frame = tk.Frame(self.task_frame, bg=self.theme.bg_color)
         input_frame.pack(fill=tk.X, pady=5, padx=10)
 
         self.task_entry = tk.Entry(input_frame, bg=self.theme.entry_bg, fg=self.theme.entry_fg)
         self.task_entry.pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
-
         self.desc_entry = tk.Entry(input_frame, bg=self.theme.entry_bg, fg=self.theme.entry_fg)
         self.desc_entry.pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
-
         self.date_entry = DateEntry(input_frame, width=12, background='darkblue', foreground='white', borderwidth=1, date_pattern='dd.mm.yyyy')
         self.date_entry.pack(side=tk.LEFT, padx=2)
-
         self.hour_var = tk.StringVar(value="12")
         self.minute_var = tk.StringVar(value="00")
-        self.hour_cb = ttk.Combobox(input_frame, width=3, textvariable=self.hour_var,
-                                    values=[f"{i:02d}" for i in range(24)], state="readonly")
+        self.hour_cb = ttk.Combobox(input_frame, width=3, textvariable=self.hour_var, values=[f"{i:02d}" for i in range(24)], state="readonly")
         self.hour_cb.pack(side=tk.LEFT)
-        self.minute_cb = ttk.Combobox(input_frame, width=3, textvariable=self.minute_var,
-                                      values=[f"{i:02d}" for i in range(60)], state="readonly")
+        self.minute_cb = ttk.Combobox(input_frame, width=3, textvariable=self.minute_var, values=[f"{i:02d}" for i in range(60)], state="readonly")
         self.minute_cb.pack(side=tk.LEFT)
-
         self.priority_var = tk.StringVar(value="Средний")
-        self.priority_menu = ttk.Combobox(input_frame, textvariable=self.priority_var,
-                                          values=["Низкий","Средний","Высокий"], state="readonly", width=10)
+        self.priority_menu = ttk.Combobox(input_frame, textvariable=self.priority_var, values=["Низкий","Средний","Высокий"], state="readonly", width=10)
         self.priority_menu.pack(side=tk.LEFT, padx=2)
-
-        add_btn = tk.Button(input_frame, text="Добавить", command=self.add_task,
-                            bg=self.theme.button_bg, fg=self.theme.button_fg, relief="flat")
+        add_btn = tk.Button(input_frame, text="Добавить", command=self.add_task, bg=self.theme.button_bg, fg=self.theme.button_fg, relief="flat")
         add_btn.pack(side=tk.LEFT, padx=2)
 
-        # ===== СПИСОК ЗАДАЧ С Drag & Drop =====
-        self.task_list = tk.Listbox(self.task_frame, bg=self.theme.bg_color, fg=self.theme.fg_color,
-                                    selectbackground=self.theme.accent_color, selectforeground=self.theme.fg_color,
-                                    borderwidth=0, highlightthickness=0, height=15)
-        self.task_list.pack(pady=5, padx=10, fill=tk.BOTH, expand=True)
-        self.task_list.bind("<<ListboxSelect>>", self.on_task_select)
+        # ===== Фильтр =====
+        self.filter_var = tk.StringVar(value="Все")
+        filter_frame = tk.Frame(self.task_frame, bg=self.theme.bg_color)
+        filter_frame.pack(fill=tk.X, padx=10, pady=5)
+        ttk.Label(filter_frame, text="Фильтр:", background=self.theme.bg_color, foreground=self.theme.fg_color).pack(side=tk.LEFT)
+        filter_menu = ttk.Combobox(filter_frame, textvariable=self.filter_var, values=["Все","Высокий","Средний","Низкий","Важные"], state="readonly", width=10)
+        filter_menu.pack(side=tk.LEFT, padx=5)
+        filter_menu.bind("<<ComboboxSelected>>", lambda e: self.refresh_task_list())
 
-        # Drag & Drop
-        self.task_list.bind("<Button-1>", self.start_drag)
-        self.task_list.bind("<B1-Motion>", self.do_drag)
-        self.drag_index = None
+        # ===== Показывать выполненные =====
+        self.show_done_var = tk.BooleanVar(value=False)
+        show_done_cb = tk.Checkbutton(filter_frame, text="Показывать выполненные",
+                                      variable=self.show_done_var, bg=self.theme.bg_color,
+                                      fg=self.theme.fg_color, command=self.refresh_task_list)
+        show_done_cb.pack(side=tk.LEFT, padx=10)
 
-        # ===== КНОПКИ ОБНОВИТЬ / УДАЛИТЬ =====
-        btn_frame = tk.Frame(self.task_frame, bg=self.theme.bg_color)
-        btn_frame.pack(pady=5)
-        tk.Button(btn_frame, text="Обновить", command=self.update_task,
-                  bg=self.theme.button_bg, fg=self.theme.button_fg, relief="flat", width=12).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="Удалить", command=self.delete_task,
-                  bg=self.theme.button_bg, fg=self.theme.button_fg, relief="flat", width=12).pack(side=tk.LEFT, padx=5)
+        # ===== Архив выполненных =====
+        archive_btn = tk.Button(filter_frame, text="Архив выполненных",
+                                bg=self.theme.button_bg, fg=self.theme.button_fg, relief="flat",
+                                command=self.show_archive)
+        archive_btn.pack(side=tk.LEFT, padx=5)
 
-    # ===== Drag & Drop =====
-    def start_drag(self, event):
-        self.drag_index = self.task_list.nearest(event.y)
-
-    def do_drag(self, event):
-        new_index = self.task_list.nearest(event.y)
-        if new_index != self.drag_index:
-            self.tasks[self.drag_index], self.tasks[new_index] = self.tasks[new_index], self.tasks[self.drag_index]
-            self.refresh_task_list()
-            self.task_list.selection_set(new_index)
-            self.drag_index = new_index
-
-    # ===== Работа с задачами =====
     def add_task(self):
         task = self.task_entry.get().strip()
         desc = self.desc_entry.get().strip()
@@ -231,81 +202,69 @@ class MultiTabApp:
         time = f"{self.hour_var.get()}:{self.minute_var.get()}"
         due = f"{date} {time}"
         priority = self.priority_var.get()
-
         if not task:
             messagebox.showwarning("Предупреждение", "Введите название задачи!")
             return
-
-        self.tasks.append({"task": task, "desc": desc, "due": due, "priority": priority})
+        self.tasks.append({"task": task, "desc": desc, "due": due, "priority": priority, "done": False, "important": False})
         self.refresh_task_list()
-        self.clear_form()
-
-    def on_task_select(self, event):
-        try:
-            index = self.task_list.curselection()[0]
-            t = self.tasks[index]
-            self.task_entry.delete(0, tk.END)
-            self.task_entry.insert(0, t["task"])
-            self.desc_entry.delete(0, tk.END)
-            self.desc_entry.insert(0, t["desc"])
-            self.date_entry.set_date(datetime.strptime(t["due"].split()[0], "%d.%m.%Y"))
-            self.hour_var.set(t["due"].split()[1].split(":")[0])
-            self.minute_var.set(t["due"].split()[1].split(":")[1])
-            self.priority_var.set(t["priority"])
-        except IndexError:
-            pass
-
-    def update_task(self):
-        try:
-            index = self.task_list.curselection()[0]
-            task = self.task_entry.get().strip()
-            desc = self.desc_entry.get().strip()
-            date = self.date_entry.get_date().strftime("%d.%m.%Y")
-            time = f"{self.hour_var.get()}:{self.minute_var.get()}"
-            due = f"{date} {time}"
-            priority = self.priority_var.get()
-            if not task:
-                messagebox.showwarning("Предупреждение", "Введите название задачи!")
-                return
-            self.tasks[index] = {"task": task, "desc": desc, "due": due, "priority": priority}
-            self.refresh_task_list()
-        except IndexError:
-            messagebox.showwarning("Предупреждение", "Выберите задачу!")
-
-    def delete_task(self):
-        try:
-            index = self.task_list.curselection()[0]
-            self.tasks.pop(index)
-            self.refresh_task_list()
-        except IndexError:
-            messagebox.showwarning("Предупреждение", "Выберите задачу!")
+        self.clear_task_form()
 
     def refresh_task_list(self):
-        self.task_list.delete(0, tk.END)
-        query = self.search_var.get().lower()
-        priority_filter = self.filter_priority_var.get()
-        date_filter = self.filter_date.get_date()
-        today = datetime.now().date()
-
+        for widget in self.task_list_frame.winfo_children():
+            widget.destroy()
+        now = datetime.now()
+        f = self.filter_var.get()
         for t in self.tasks:
-            task_text = t["task"].lower()
-            display_text = f"[{t['priority']}] {t['task']} - {t['desc']} (Срок: {t['due']})" if t['desc'] else f"[{t['priority']}] {t['task']} (Срок: {t['due']})"
-            task_date = datetime.strptime(t["due"].split()[0], "%d.%m.%Y").date()
+            if t.get("done", False) and not self.show_done_var.get():
+                continue
+            if f == "Важные" and not t.get("important", False):
+                continue
+            elif f in ["Высокий","Средний","Низкий"] and t["priority"] != f:
+                continue
 
-            if (query in task_text) and \
-               (priority_filter == "Все" or t["priority"] == priority_filter) and \
-               (task_date <= date_filter):
-                self.task_list.insert(tk.END, display_text)
-                index = self.task_list.size() - 1
-                # Подсветка
-                if task_date < today:
-                    self.task_list.itemconfig(index, fg="#FF5555")  # Просрочено
-                elif task_date == today:
-                    self.task_list.itemconfig(index, fg="#FFD700")  # Сегодня
-                else:
-                    self.task_list.itemconfig(index, fg=self.theme.fg_color)
+            due_dt = datetime.strptime(t["due"], "%d.%m.%Y %H:%M")
+            bg_color = {"Высокий":"#F04747","Средний":"#FAA61A","Низкий":"#43B581"}.get(t["priority"], self.theme.entry_bg)
+            if not t.get("done", False) and due_dt < now:
+                bg_color = "#8B0000"
 
-    def clear_form(self):
+            frame = tk.Frame(self.task_list_frame, bg=bg_color, bd=1, relief="solid")
+            frame.pack(fill=tk.X, padx=5, pady=3)
+            frame.index = self.tasks.index(t)
+
+            var = tk.BooleanVar(value=t.get("done", False))
+            chk = tk.Checkbutton(frame, variable=var, bg=bg_color,
+                                 command=lambda i=frame.index,v=var: self.toggle_done(i,v))
+            chk.pack(side=tk.LEFT, padx=5)
+
+            star_btn = tk.Button(frame, text="★" if t.get("important", False) else "☆",
+                                 bg=bg_color, fg="#FFD700", relief="flat",
+                                 command=lambda i=frame.index: self.toggle_important(i))
+            star_btn.pack(side=tk.LEFT, padx=5)
+
+            fg_color = self.theme.fg_color if not t.get("done", False) else "#888888"
+            task_text = t["task"]
+            if t.get("done", False):
+                task_text = f"✔ {task_text}"
+            tk.Label(frame, text=task_text, bg=bg_color, fg=fg_color, font=("Helvetica",12,"bold")).pack(side=tk.TOP, anchor="w")
+            if t["desc"]:
+                tk.Label(frame, text=t["desc"], bg=bg_color, fg=self.theme.fg_color, font=("Helvetica",10)).pack(side=tk.TOP, anchor="w")
+            tk.Label(frame, text=t["due"], bg=bg_color, fg="#FFFFFF", font=("Helvetica",9)).pack(side=tk.RIGHT, padx=5)
+            self.make_draggable(frame)
+        self.autosave_tasks()
+
+    def toggle_done(self,index,var):
+        task = self.tasks[index]
+        task["done"] = var.get()
+        if var.get():  # перемещаем в архив
+            self.completed_tasks.append(task)
+            self.tasks.pop(index)
+        self.refresh_task_list()
+
+    def toggle_important(self,index):
+        self.tasks[index]["important"] = not self.tasks[index].get("important", False)
+        self.refresh_task_list()
+
+    def clear_task_form(self):
         self.task_entry.delete(0, tk.END)
         self.desc_entry.delete(0, tk.END)
         self.date_entry.set_date(datetime.now())
@@ -313,31 +272,94 @@ class MultiTabApp:
         self.minute_var.set("00")
         self.priority_var.set("Средний")
 
-    def on_close(self):
+    def autosave_tasks(self):
         try:
             with open(self.autosave_file, "w", encoding="utf-8") as f:
-                json.dump(self.tasks, f, ensure_ascii=False, indent=2)
-        except:
-            pass
-        self.root.destroy()
+                json.dump({"tasks": self.tasks, "completed": self.completed_tasks}, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            print("Ошибка автосохранения:", e)
 
-    # ===== Остальные вкладки =====
+    # ===== Drag&Drop =====
+    def make_draggable(self, widget):
+        widget.bind("<Button-1>", self.on_drag_start)
+        widget.bind("<B1-Motion>", self.on_drag_motion)
+        widget.bind("<ButtonRelease-1>", self.on_drag_release)
+
+    def on_drag_start(self, event):
+        self.drag_data = {"widget": event.widget, "y": event.y_root}
+
+    def on_drag_motion(self, event):
+        widget = self.drag_data["widget"]
+        dy = event.y_root - self.drag_data["y"]
+        widget.place(y=widget.winfo_y() + dy)
+        self.drag_data["y"] = event.y_root
+
+    def on_drag_release(self, event):
+        widget = self.drag_data["widget"]
+        widget.place_forget()
+        children = sorted(self.task_list_frame.winfo_children(), key=lambda w: w.winfo_y())
+        new_tasks_order = []
+        for w in children:
+            new_tasks_order.append(self.tasks[w.index])
+        self.tasks = new_tasks_order
+        self.refresh_task_list()
+        self.drag_data = None
+
+    def show_archive(self):
+        archive_win = tk.Toplevel(self.root)
+        archive_win.title("Архив выполненных задач")
+        archive_win.geometry("600x400")
+        archive_win.config(bg=self.theme.bg_color)
+
+        list_frame = tk.Frame(archive_win, bg=self.theme.bg_color)
+        list_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        for t in self.completed_tasks:
+            due_dt = t["due"]
+            bg_color = {"Высокий":"#F04747","Средний":"#FAA61A","Низкий":"#43B581"}.get(t["priority"], self.theme.entry_bg)
+            frame = tk.Frame(list_frame, bg=bg_color, bd=1, relief="solid")
+            frame.pack(fill=tk.X, padx=5, pady=3)
+            tk.Label(frame, text=f"✔ {t['task']} ({due_dt})", bg=bg_color, fg="#888888", font=("Helvetica",12,"bold")).pack(side=tk.LEFT)
+            if t["desc"]:
+                tk.Label(frame, text=t["desc"], bg=bg_color, fg="#CCCCCC", font=("Helvetica",10)).pack(side=tk.LEFT)
+
+    # ===== Заметки =====
+    def create_note_widgets(self):
+        self.note_text = tk.Text(self.note_frame, bg=self.theme.bg_color, fg=self.theme.fg_color)
+        self.note_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+    # ===== Навигатор =====
+    def create_nav_widgets(self):
+        tk.Label(self.nav_frame, text="Навигатор", bg=self.theme.bg_color, fg=self.theme.fg_color).pack(pady=10)
+        self.coords_entry = tk.Entry(self.nav_frame, bg=self.theme.entry_bg, fg=self.theme.entry_fg)
+        self.coords_entry.pack(padx=10, pady=5)
+        tk.Button(self.nav_frame, text="Найти маршрут", bg=self.theme.button_bg, fg=self.theme.button_fg,
+                  relief="flat", command=self.search_route).pack(pady=2)
+        self.route_text = tk.Text(self.nav_frame, bg=self.theme.bg_color, fg=self.theme.fg_color, height=15)
+        self.route_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+    def search_route(self):
+        coords = self.coords_entry.get().strip()
+        if coords:
+            self.route_text.delete(1.0, tk.END)
+            self.route_text.insert(tk.END, f"Маршрут до {coords}\n1. Поверните направо\n2. Проедьте 2 км\n")
+            self.coords_entry.delete(0, tk.END)
+        else:
+            messagebox.showwarning("Предупреждение","Введите координаты!")
+
+    # ===== Карты =====
     def create_map_widgets(self):
         tk.Label(self.map_frame, text="Карты", bg=self.theme.bg_color, fg=self.theme.fg_color).pack(pady=20)
 
-    def create_note_widgets(self):
-        tk.Label(self.note_frame, text="Заметки (в разработке)", bg=self.theme.bg_color, fg=self.theme.fg_color).pack(pady=20)
-
-    def create_nav_widgets(self):
-        tk.Label(self.nav_frame, text="Навигатор", bg=self.theme.bg_color, fg=self.theme.fg_color,
-                 font=("Helvetica", 14, "bold")).pack(pady=20)
-
+    # ===== Закрытие =====
+    def on_close(self):
+        self.autosave_tasks()
+        self.root.destroy()
 
 def main():
     root = tk.Tk()
     app = MultiTabApp(root)
     root.mainloop()
-
 
 if __name__ == "__main__":
     main()
