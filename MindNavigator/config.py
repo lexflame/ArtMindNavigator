@@ -1,0 +1,9 @@
+class DarkTheme:
+    BG_COLOR = "#2C2F33"
+    FG_COLOR = "#FFFFFF"
+    ACCENT_COLOR = "#7289DA"
+    ENTRY_BG = "#36393F"
+    ENTRY_FG = "#FFFFFF"
+    BUTTON_BG = "#23272A"
+    BUTTON_FG = "#FFFFFF"
+    TITLE_BAR_BG = "#202225"
