@@ -1,0 +1,6 @@
+{
+    "profiles": {
+        "Default": "notes.txt"
+    },
+    "current_profile": "Default"
+}
