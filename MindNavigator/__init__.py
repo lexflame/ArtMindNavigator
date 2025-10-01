@@ -88,11 +88,12 @@ class MultiTabApp:
             btn.pack(side=tk.LEFT, padx=5)
 
         # ==== Кнопки управления окном ====
-        self.btn_min = tk.Button(
-            self.title_bar, text="━", command=self.minimize,
-            bg=self.theme.button_bg, fg=self.theme.button_fg, relief="flat", width=4
+        self.btn_close = tk.Button(
+            self.title_bar, text="✕", command=self.root.quit,
+            bg="#FF5555", fg="white", relief="flat", width=4
         )
-        self.btn_min.pack(side=tk.RIGHT, padx=2)
+        self.btn_close.pack(side=tk.RIGHT, padx=2)
+
 
         self.btn_max = tk.Button(
             self.title_bar, text="❐", command=self.toggle_maximize,
@@ -100,11 +101,13 @@ class MultiTabApp:
         )
         self.btn_max.pack(side=tk.RIGHT, padx=2)
 
-        self.btn_close = tk.Button(
-            self.title_bar, text="✕", command=self.root.quit,
-            bg="#FF5555", fg="white", relief="flat", width=4
+        self.btn_min = tk.Button(
+            self.title_bar, text="━", command=self.minimize,
+            bg=self.theme.button_bg, fg=self.theme.button_fg, relief="flat", width=4
         )
-        self.btn_close.pack(side=tk.RIGHT, padx=2)
+        self.btn_min.pack(side=tk.RIGHT, padx=2)
+
+
 
         # ==== ОСНОВНОЙ КОНТЕНТ ====
         self.content = tk.Frame(self.root, bg=self.theme.bg_color)
