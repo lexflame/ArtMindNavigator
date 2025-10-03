@@ -15,6 +15,28 @@ class TaskView:
         self.create_widgets()
         self.refresh_task_list()
 
+        layout_menu = QVBoxLayout()
+        layout_menu.setContentsMargins(0, 0, 0, 0)
+        for name in ["Главная", "Настройки", "Синхронизация", "Выход"]:
+            btn = QPushButton(name)
+            btn.setStyleSheet(f"""
+                        QPushButton {{
+                            background-color: {BUTTON_BG};
+                            color: {FONT_COLOR};
+                            border: none;
+                            padding: 10px;
+                            text-align: left;
+                        }}
+                        QPushButton:hover {{
+                            background-color: {BUTTON_HOVER};
+                        }}
+                    """)
+            if name == "Выход":
+                btn.clicked.connect(self.close)
+            layout_menu.addWidget(btn)
+        layout_menu.addStretch()
+        self.side_menu.setLayout(layout_menu)
+
     def create_widgets(self):
         self.input_frame = tk.Frame(self.frame, bg=self.theme.BG_COLOR)
         self.input_frame.pack(fill=tk.X, pady=5, padx=10)

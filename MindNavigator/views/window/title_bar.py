@@ -8,16 +8,16 @@ class TitleBar(QWidget):
         self.parent = parent
         self.toggle_menu_callback = toggle_menu_callback
         self.setFixedHeight(40)
-        self.setStyleSheet(f"background-color: {TITLE_BAR_BG}; color: {FONT_COLOR};")
+        self.setStyleSheet(f"background-color: {TITLE_BAR_BG}; color: {FONT_COLOR}; ")
         self.old_pos = None
 
         # Гамбургер
         self.btn_menu = QPushButton("☰")
-        self.btn_menu.setFixedSize(40, 40)
+        self.btn_menu.setFixedSize(45, 45)
         self.btn_menu.setStyleSheet(f"""
             QPushButton {{
                 background-color: {BUTTON_BG};
-                border: none;
+                border: 0.5px solid black;
                 font-weight: bold;
                 color: {FONT_COLOR};
             }}
